@@ -1,0 +1,449 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,automata,calc}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{nettoyer}{RGB}{31,94,168}
+\definecolor{charger}{RGB}{196,72,40}
+
+\newcommand{\N}{\textsc{Nettoyer}}
+\newcommand{\C}{\textsc{Charger}}
+\newcommand{\pd}{p_{\text{dust}}}
+
+\title{Case study 2 -- Le robot nettoyeur\\[2pt]
+\large Modélisation et résolution par un processus de décision markovien}
+\author{Lagier Hadrien, Serratos Paul, Tsan Alex}
+\date{M2 -- Décision}
+
+\begin{document}
+\maketitle
+
+\noindent Le modèle est implémenté en Python avec la bibliothèque \texttt{pymdptoolbox} de l'INRAE.
+Le programme fourni (\texttt{iadec26\_2-MDPs\_CS-robot-nett-fr.py}) construit les matrices décrites
+ci-dessous, vérifie qu'elles sont stochastiques et calcule les politiques optimales présentées dans ce rapport.
+
+%==========================================================================
+\section{Modélisation (question A)}
+%==========================================================================
+
+\subsection{États}
+
+Un état combine la position du robot et la propreté du salon. Le robot lui-même n'est ni propre ni sale :
+la seconde lettre décrit toujours l'état \emph{du salon}.
+
+\begin{center}
+\begin{tabular}{>{\bfseries}l l l}
+\toprule
+État & Position du robot & Salon \\
+\midrule
+LD & salon (\emph{Living room}) & sale (\emph{Dirty}) \\
+LC & salon & propre (\emph{Clean}) \\
+CD & station de charge (\emph{Charger}) & sale \\
+CC & station de charge & propre \\
+O  & hors tension (\emph{Off}) & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Actions}
+
+Deux actions sont disponibles dans tous les états : \N{} et \C.
+\begin{itemize}
+  \item \N{} : le robot se rend (ou reste) dans le salon et le nettoie. Il arrive donc toujours dans un état L$\ast$.
+  \item \C{} : le robot se rend (ou reste) à la station de charge. Il arrive donc toujours dans un état C$\ast$.
+  \item En O, les deux actions ont le même effet : le robot reste hors tension.
+\end{itemize}
+
+\subsection{Hypothèses d'interprétation}
+
+L'énoncé laisse quelques points ouverts. Nous les tranchons ainsi :
+\begin{enumerate}
+  \item \textbf{La poussière concerne le salon.} « Lorsque le robot charge, [le salon] peut passer de propre
+        à sale avec une probabilité $\pd$ ». C'est cohérent avec la suite de la phrase (« si le salon est déjà sale,
+        il reste sale »).
+  \item \textbf{\N{} depuis la station} signifie quitter la station pour aller nettoyer le salon. Le robot part
+        batterie pleine, donc ce nettoyage ne peut pas provoquer de panne. Depuis le salon, la batterie a déjà servi,
+        d'où le risque de panne $e$.
+  \item \textbf{O est absorbant} : une fois hors tension, le robot n'en sort plus.
+  \item Le salon ne se salit que pendant la charge (seule source de poussière mentionnée par l'énoncé).
+\end{enumerate}
+
+\subsection{Paramètres}
+
+\begin{center}
+\begin{tabular}{>{$}c<{$} l}
+\toprule
+e & probabilité de tomber en panne en nettoyant depuis le salon \\
+\varepsilon & probabilité d'échec du nettoyage d'un sol sale \\
+\pd & probabilité que le salon se salisse pendant une charge \\
+\gamma & facteur d'actualisation (horizon infini), $\gamma = 0{,}8$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Graphe du MDP}
+
+La figure~\ref{fig:mdp} représente toutes les transitions possibles. Les flèches pleines bleues
+correspondent à l'action \N, les flèches pointillées rouges à l'action \C.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.6mm]},
+    state/.style={circle, draw, thick, minimum size=13mm, font=\bfseries},
+    n/.style={->, thick, nettoyer},
+    c/.style={->, thick, charger, dashed},
+    lbl/.style={font=\footnotesize, fill=white, inner sep=1.2pt},
+    every loop/.style={looseness=6}
+  ]
+  \node[state] (LD) at (0,3.6) {LD};
+  \node[state] (LC) at (7,3.6) {LC};
+  \node[state] (CD) at (0,0)   {CD};
+  \node[state] (CC) at (7,0)   {CC};
+  \node[state, fill=black!8] (O) at (3.5,7) {O};
+
+  % --- Nettoyer ---
+  \draw[n] (LD) to node[lbl, pos=0.5] {$(1-e)(1-\varepsilon)$} (LC);
+  \draw[n] (LD) to[out=150, in=210, loop] node[lbl, left] {$(1-e)\varepsilon$} (LD);
+  \draw[n] (LD) to node[lbl, pos=0.45] {$e$} (O);
+  \draw[n] (LC) to[out=30, in=-30, loop] node[lbl, right] {$1-e$} (LC);
+  \draw[n] (LC) to node[lbl, pos=0.45] {$e$} (O);
+  \draw[n] (CD) to[bend left=22] node[lbl, pos=0.5] {$\varepsilon$} (LD);
+  \draw[n] (CD) to[bend left=8] node[lbl, pos=0.3] {$1-\varepsilon$} (LC);
+  \draw[n] (CC) to[bend right=22] node[lbl, pos=0.5] {$1$} (LC);
+
+  % --- Charger ---
+  \draw[c] (LD) to[bend left=22] node[lbl, pos=0.5] {$1$} (CD);
+  \draw[c] (CD) to[out=210, in=150, loop] node[lbl, left] {$1$} (CD);
+  \draw[c] (LC) to[bend right=22] node[lbl, pos=0.5] {$1-\pd$} (CC);
+  \draw[c] (LC) to[bend left=8] node[lbl, pos=0.3] {$\pd$} (CD);
+  \draw[c] (CC) to[out=-30, in=30, loop] node[lbl, right] {$1-\pd$} (CC);
+  \draw[c] (CC) to node[lbl, pos=0.5] {$\pd$} (CD);
+
+  % --- O absorbant ---
+  \draw[n] (O) to[out=60, in=120, loop] node[lbl, above] {$1$ (les deux actions)} (O);
+
+  % --- Légende ---
+  \begin{scope}[shift={(9.6,6.6)}]
+    \draw[n] (0,0) -- (1,0) node[right, black, font=\small] {\N};
+    \draw[c] (0,-0.6) -- (1,-0.6) node[right, black, font=\small] {\C};
+  \end{scope}
+\end{tikzpicture}
+\caption{Graphe du MDP du robot nettoyeur (5 états, 2 actions).}
+\label{fig:mdp}
+\end{figure}
+
+\subsection{Matrices de transition}
+
+Les états sont ordonnés (LD, LC, CD, CC, O). L'élément $(s, s')$ de $P^a$ vaut $P(s' \mid s, a)$ ;
+chaque ligne somme à 1 (vérifié dans le programme par \texttt{verify\_transition\_add\_to1} et
+\texttt{mdptoolbox.util.check}).
+
+\[
+P^{\N} =
+\begin{pmatrix}
+(1-e)\varepsilon & (1-e)(1-\varepsilon) & 0 & 0 & e \\
+0 & 1-e & 0 & 0 & e \\
+\varepsilon & 1-\varepsilon & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 1
+\end{pmatrix}
+\qquad
+P^{\C} =
+\begin{pmatrix}
+0 & 0 & 1 & 0 & 0 \\
+0 & 0 & \pd & 1-\pd & 0 \\
+0 & 0 & 1 & 0 & 0 \\
+0 & 0 & \pd & 1-\pd & 0 \\
+0 & 0 & 0 & 0 & 1
+\end{pmatrix}
+\]
+
+Dans \texttt{mdptoolbox}, ces deux matrices forment un tableau $P$ de dimension
+$(|A|, |S|, |S|) = (2, 5, 5)$.
+
+\subsection{Matrice de récompense}
+
+L'énoncé attache la récompense à l'\emph{état} : $r_c$ pour un salon propre, $r_d$ pour un salon sale,
+$\mathit{costcrash}$ hors tension. La récompense ne dépend donc pas de l'action ; dans \texttt{mdptoolbox},
+$R$ est de dimension $(|S|, |A|)$ avec deux colonnes identiques :
+\[
+R =
+\begin{pmatrix}
+r_d & r_d \\
+r_c & r_c \\
+r_d & r_d \\
+r_c & r_c \\
+\mathit{costcrash} & \mathit{costcrash}
+\end{pmatrix}
+\quad \text{(lignes LD, LC, CD, CC, O ; colonnes \N, \C)}.
+\]
+
+Nous avons volontairement écarté une récompense qui noterait les \emph{décisions}
+(par exemple $+10$ pour « nettoyer un salon sale »). Une telle récompense incite le robot à laisser le salon se salir pour
+pouvoir le nettoyer à nouveau : en simulation, avec $e = 0$ et $\pd = 0{,}9$, le salon n'était plus propre que
+49\,\% du temps, contre 100\,\% avec une récompense par état. La récompense décrit \emph{l'objectif} ;
+c'est à l'optimisation de trouver \emph{les actions} qui l'atteignent.
+
+%==========================================================================
+\section{Valeurs des récompenses (question B)}
+%==========================================================================
+
+\begin{center}
+\begin{tabular}{>{$}c<{$} r l}
+\toprule
+r_c & $10$ & un salon propre est l'objectif du robot \\
+r_d & $0$ & un salon sale est une situation neutre, à corriger \\
+\mathit{costcrash} & $-20$ & une panne est pénalisée à chaque pas, pour toujours \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Ces valeurs respectent les contraintes de l'énoncé, $\mathit{costcrash} \le r_d < r_c$ (vérifiées dans le programme).
+
+Comme O est absorbant, la pénalité de panne se cumule indéfiniment :
+\[
+V(\text{O}) = \sum_{t \ge 0} \gamma^t \cdot \mathit{costcrash} = \frac{-20}{1 - 0{,}8} = -100.
+\]
+Une panne coûte donc l'équivalent de dix pas passés dans un salon propre. C'est cet écart qui
+rend le robot prudent : nous n'avons pas choisi $\mathit{costcrash}$ beaucoup plus négatif, sinon le robot
+refuserait de prendre le moindre risque quelles que soient les valeurs de $e$.
+
+%==========================================================================
+\section{Résolution et résultats (question C)}
+%==========================================================================
+
+\subsection{Méthode}
+
+Pour chaque scénario, nous construisons $P$ et lançons \texttt{mdptoolbox.mdp.ValueIteration(P, R, 0.8)}
+(convergence en 43 itérations). Nous avons vérifié avec \texttt{PolicyIteration} que les deux algorithmes
+donnent la même politique dans tous les cas. Les paramètres communs sont $\varepsilon = 0{,}2$ et $\gamma = 0{,}8$.
+
+La valeur d'une action dans un état est
+\[
+Q(s,a) = R(s,a) + \gamma \sum_{s'} P(s' \mid s,a)\, V(s'),
+\]
+et la politique optimale choisit dans chaque état l'action de plus grande valeur $Q$.
+
+\subsection{Politiques optimales}
+
+\begin{center}
+\begin{tabular}{l c c c c c c}
+\toprule
+Scénario & $e$ & $\pd$ & LD & LC & CD & CC \\
+\midrule
+1. Panne probable & $0{,}5$ & $0{,}3$ & \C & \C & \N & \N \\
+2. Panne peu probable & $0{,}05$ & $0{,}3$ & \N & \C & \N & \N \\
+3. Très bonne batterie & $0{,}001$ & $0{,}3$ & \N & \N & \N & \N \\
+4. Salon se salit vite & $0{,}1$ & $0{,}9$ & \C & \C & \N & \N \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+En O, les deux actions sont équivalentes ; la politique y est sans objet.
+
+\begin{center}
+\begin{tabular}{l r r r r r}
+\toprule
+Scénario & $V(\text{LD})$ & $V(\text{LC})$ & $V(\text{CD})$ & $V(\text{CC})$ & $V(\text{O})$ \\
+\midrule
+1 & 24,4 & 41,5 & 30,5 & 43,2 & $-100$ \\
+2 & 25,1 & 41,6 & 30,6 & 43,3 & $-100$ \\
+3 & 37,5 & 49,4 & 37,6 & 49,5 & $-100$ \\
+4 & 15,6 & 26,5 & 19,4 & 31,2 & $-100$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Interprétation}
+
+\paragraph{Le chargeur comme « point de départ sûr ».}
+Dans tous les scénarios, depuis la station (CD, CC) le robot choisit \N. Ce nettoyage est sans risque de panne :
+c'est la meilleure action possible. Le robot dispose donc toujours d'un chemin sûr vers un salon propre,
+\[
+\text{LD} \xrightarrow{\C} \text{CD} \xrightarrow{\N} \text{LC},
+\qquad
+\text{LC} \xrightarrow{\C} \text{CC} \xrightarrow{\N} \text{LC},
+\]
+qui ne coûte qu'un pas de temps supplémentaire. Toute la question est de savoir si ce détour vaut le risque
+de panne évité.
+
+\paragraph{Scénario 1 (panne probable).}
+Avec $e = 0{,}5$, nettoyer depuis le salon revient à risquer une chance sur deux de perdre $V(\text{O}) = -100$.
+Le robot ne nettoie donc jamais depuis le salon : il repasse systématiquement par la station
+(cycle « recharger, puis repartir nettoyer »).
+
+\paragraph{Scénario 2 (panne peu probable).}
+Avec $e = 0{,}05$, la politique se scinde :
+\begin{itemize}
+  \item en LD, le robot nettoie directement : le gain d'un salon propre immédiatement l'emporte sur 5\,\% de risque ;
+  \item en LC, le robot va charger : le salon est déjà propre, il n'y a rien à gagner à prendre un risque.
+\end{itemize}
+Le robot n'accepte le risque de panne que lorsqu'il y a un bénéfice immédiat.
+
+\paragraph{Scénario 3 (très bonne batterie).}
+Avec $e = 0{,}001$, le risque est négligeable : le robot nettoie partout et reste dans le salon, qui ne se
+salit jamais pendant qu'il y est. Le détour par la station ne présente plus d'intérêt, et il exposerait même le
+salon à la poussière.
+
+\paragraph{Scénario 4 (salon qui se salit vite).}
+Avec $e = 0{,}1$, la politique est la même qu'au scénario 1 : le risque de panne domine. La poussière fait
+cependant baisser toutes les valeurs (un salon propre se resalit dès que le robot va charger).
+L'effet de $\pd$ sur la politique n'apparaît que lorsque $e$ est petit, comme le montre l'étude ci-dessous.
+
+\subsection{Étude de sensibilité}
+
+Pour mieux situer les changements de politique, nous avons fait varier $e$ pour deux valeurs de $\pd$
+(politique en LD / LC ; en CD et CC, le robot nettoie toujours) :
+
+\begin{center}
+\begin{tabular}{c c c}
+\toprule
+$e$ & $\pd = 0{,}3$ & $\pd = 0{,}9$ \\
+\midrule
+$0{,}2$ et $0{,}1$ & \C{} / \C & \C{} / \C \\
+$0{,}05$ & \N{} / \C & \C{} / \C \\
+$0{,}03$ à $0{,}015$ & \N{} / \C & \N{} / \N \\
+$\le 0{,}01$ & \N{} / \N & \N{} / \N \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Deux effets apparaissent :
+\begin{itemize}
+  \item \textbf{Un salon qui se salit vite pousse le robot à rester dans le salon} quand la batterie est
+        fiable : pour $e$ entre $0{,}015$ et $0{,}03$, LC passe de \C{} à \N{} quand $\pd$ augmente.
+        Aller charger, c'est laisser la poussière s'installer.
+  \item \textbf{Mais il rend le robot plus prudent quand le risque est modéré} : pour $e = 0{,}05$, LD passe de
+        \N{} à \C. Un salon propre a moins de valeur s'il se resalit vite, donc le gain à le nettoyer
+        immédiatement pèse moins face au risque de panne.
+\end{itemize}
+
+%==========================================================================
+\section{Bonus : plusieurs niveaux de batterie}
+%==========================================================================
+
+\subsection{Modèle}
+
+Nous ajoutons un niveau de batterie $b \in \{\text{H}, \text{M}, \text{L}\}$ (haut, moyen, bas) à chaque état.
+On obtient $2 \times 2 \times 3 = 12$ états LDH, LDM, \dots, CCL, plus l'état O. Un seul état hors tension suffit,
+puisque « hors tension » signifie batterie vide : il y a donc \textbf{13 états}.
+
+Le risque de panne ne dépend plus de la position du robot mais de son niveau de batterie, ce qui est plus réaliste.
+Le paramètre $e$ est remplacé par $e_b$ :
+\[
+e_{\text{H}} = 0{,}01, \qquad e_{\text{M}} = 0{,}1, \qquad e_{\text{L}} = 0{,}25.
+\]
+
+\begin{center}
+\begin{tabular}{l l l l}
+\toprule
+Action & Position & Batterie & Salon \\
+\midrule
+\N & $\to$ salon & panne avec prob.\ $e_b$, sinon perd un niveau & sale $\to$ propre avec prob.\ $1-\varepsilon$ \\
+\C & $\to$ station & gagne un niveau & propre $\to$ sale avec prob.\ $\pd$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Le niveau bas reste bas en nettoyant, et le niveau haut reste haut en chargeant.
+Par exemple, depuis un état de batterie $b$ avec un salon sale :
+\[
+P(\text{LC}b^- \mid \text{xD}b, \N) = (1-e_b)(1-\varepsilon), \quad
+P(\text{LD}b^- \mid \text{xD}b, \N) = (1-e_b)\,\varepsilon, \quad
+P(\text{O} \mid \text{xD}b, \N) = e_b,
+\]
+où $b^-$ est le niveau inférieur à $b$ et x la position (L ou C). Les récompenses suivent la même règle que
+le modèle de base : $r_c$ pour les six états « propre », $r_d$ pour les six états « sale », $\mathit{costcrash}$ pour O.
+
+La figure~\ref{fig:batt} montre l'évolution du niveau de batterie selon l'action.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.6mm]},
+    state/.style={circle, draw, thick, minimum size=11mm, font=\bfseries},
+    n/.style={->, thick, nettoyer},
+    c/.style={->, thick, charger, dashed},
+    lbl/.style={font=\footnotesize, fill=white, inner sep=1.2pt},
+    every loop/.style={looseness=6}
+  ]
+  \node[state] (H) at (0,0) {H};
+  \node[state] (M) at (3.5,0) {M};
+  \node[state] (L) at (7,0) {L};
+  \node[state, fill=black!8] (O) at (3.5,-3.2) {O};
+
+  \draw[n] (H) to[bend left=25] node[lbl] {$1-e_{\text{H}}$} (M);
+  \draw[n] (M) to[bend left=25] node[lbl] {$1-e_{\text{M}}$} (L);
+  \draw[n] (L) to[out=30, in=-30, loop] node[lbl, right] {$1-e_{\text{L}}$} (L);
+  \draw[n] (H) to node[lbl] {$e_{\text{H}}$} (O);
+  \draw[n] (M) to node[lbl] {$e_{\text{M}}$} (O);
+  \draw[n] (L) to node[lbl] {$e_{\text{L}}$} (O);
+
+  \draw[c] (L) to[bend left=25] node[lbl] {$1$} (M);
+  \draw[c] (M) to[bend left=25] node[lbl] {$1$} (H);
+  \draw[c] (H) to[out=150, in=210, loop] node[lbl, left] {$1$} (H);
+\end{tikzpicture}
+\caption{Évolution du niveau de batterie (la position et la propreté du salon évoluent comme dans le modèle de base).}
+\label{fig:batt}
+\end{figure}
+
+\subsection{Résultats}
+
+Avec $\varepsilon = 0{,}2$ et $\gamma = 0{,}8$, nous avons testé trois scénarios :
+\begin{itemize}
+  \item batterie standard : $e_b = (0{,}01;\ 0{,}1;\ 0{,}25)$, $\pd = 0{,}3$ ;
+  \item salon qui se salit vite : même batterie, $\pd = 0{,}9$ ;
+  \item très bonne batterie : $e_b = (0;\ 0{,}05;\ 0{,}5)$, $\pd = 0{,}3$.
+\end{itemize}
+
+Dans les trois cas, la politique optimale (identique par itération de la valeur et de la politique) est :
+\begin{center}
+\begin{tabular}{l c c c}
+\toprule
+& batterie haute & batterie moyenne & batterie basse \\
+\midrule
+Action & \N & \C & \C \\
+\bottomrule
+\end{tabular}
+\end{center}
+quels que soient la position du robot et l'état du salon.
+
+\subsection{Interprétation}
+
+\begin{itemize}
+  \item \textbf{Le niveau de batterie devient le seul critère de décision.} Le risque de panne dépend désormais
+        uniquement de la batterie, si bien que les états L$\ast b$ et C$\ast b$ ont exactement la même valeur.
+        La position du robot n'apporte plus d'information.
+  \item \textbf{Le robot nettoie uniquement batterie pleine.} En batterie moyenne, nettoyer coûte à la fois un
+        risque de panne plus élevé et une descente en batterie basse, d'où il faudra de toute façon remonter.
+        Charger ne coûte qu'un pas et ramène en batterie haute, où nettoyer est presque sans risque.
+  \item \textbf{La politique est robuste.} Elle ne change ni avec $\pd$, ni avec une batterie haute parfaite :
+        l'écart de risque entre les niveaux suffit à imposer le cycle « nettoyer à pleine charge, recharger dès que la
+        batterie baisse ».
+\end{itemize}
+
+Ce modèle corrige la principale limite du modèle de base, où nettoyer depuis la station était toujours sans risque.
+
+%==========================================================================
+\section{Limites}
+%==========================================================================
+
+\begin{itemize}
+  \item La charge est très avantageuse : un seul pas suffit pour gagner un niveau, sans aucun risque. Une charge
+        probabiliste ou plus lente rendrait les allers-retours vers la station plus coûteux.
+  \item Le salon ne se salit que pendant la charge ; en réalité, il se salit aussi pendant que le robot est dans le salon.
+  \item Les politiques dépendent fortement du rapport entre $\mathit{costcrash}$, $r_c$ et $\gamma$. Une étude de
+        sensibilité sur ces paramètres compléterait l'analyse.
+\end{itemize}
+
+\end{document}
