@@ -29,12 +29,12 @@ def calibrate(path):
         patternFound, corners = detectPattern(view, cols = 7, rows = 15)
         if patternFound:
             imgName.append(image_names[idx])
-            idx=idx+1
             imgCalib.append(view)
             imgPoints.append(corners)
 
             #Add corresponding object points
             objectPoints.append(asymmetricWorldPoints(cols = 7, rows = 15, patternSize_mm = 85.0))
+        idx=idx+1
 
     #Calibrate camera
     rms, mtx, dist, rvecs, tvecs, pve = calibrateMono(objectPoints, imgPoints, imgSize)
@@ -62,9 +62,11 @@ def calibrate(path):
     plotRMS(pve, rms, imgName, figureName = 'RMS Plot')
 
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+
 #Calibration Gauche
-calibrate(os.path.join("data\\calibration_nav_3003\\NAV\\Calib", '*_0.png'))
+calibrate(os.path.join(DATA_DIR, "Calib", '*_0.png'))
 
 
 #Calibration Droite
-calibrate(os.path.join("data\\calibration_nav_3003\\NAV\\Calib", '*_1.png'))
+calibrate(os.path.join(DATA_DIR, "Calib", '*_1.png'))

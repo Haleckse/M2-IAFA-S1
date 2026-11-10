@@ -1,6 +1,7 @@
 # This import registers the 3D projection, but is otherwise unused.
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -34,7 +35,7 @@ ax.set_zlabel('Z Label')
 
 plt.show()
 
-name = "data\\stereo\\MinnieRawRight.png"
+name = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "Test", "right_2.png")
 image = cv2.imread(name)
 fig = plt.figure(2)
 ax = fig.add_subplot(111)

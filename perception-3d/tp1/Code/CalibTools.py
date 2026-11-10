@@ -22,9 +22,7 @@ def detectPattern(frame, cols = 6, rows = 7):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # 1.1.1.2 - Implémenter la fonction findChessboardCorners ou findCircleGrid en fonction du type de mire utilisé
     # C'est à vous de jouer!!!
-    # 
-    #
-
+    patternFound, imgPoints = cv2.findCirclesGrid(gray, (cols, rows), flags=cv2.CALIB_CB_ASYMMETRIC_GRID)
 
     if patternFound:
         result = cv2.drawChessboardCorners(frame.copy(), (cols, rows), imgPoints, patternFound)
@@ -39,8 +37,9 @@ def asymmetricWorldPoints(cols = 7, rows = 6, patternSize_mm = 1.0):
     
     #1.1.2.1 - Créer une liste de points 3D correspondant à chaque point de la mire
     # C'est à vous de jouer!!!
-    # 
-    #
+    for i in range(rows):
+        for j in range(cols):
+            patternPoints.append([2 * j + i % 2, i, 0])
                 
     return np.array(patternPoints).astype('float32') * patternSize_mm
 
@@ -54,8 +53,9 @@ def calibrateMono(objpoints, imgpoints, imgSize):
 
     #1.1.2.2 - Implémenter la fonction calibrateCameraExtended
     # C'est à vous de jouer!!!
-    # 
-    #
+    ret, mtx, dist, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, pve = cv2.calibrateCameraExtended(
+        objpoints, imgpoints, imgSize, None, None
+    )
     return ret, mtx, dist, rvecs, tvecs, pve
 
 def computeCorrectionMapsMono(imageSize, mtx, dist, alpha = 1.0, xRatio = 1, yRatio = 1):
@@ -68,8 +68,7 @@ def computeCorrectionMapsMono(imageSize, mtx, dist, alpha = 1.0, xRatio = 1, yRa
 
     # 1.1.3.1 - Implement initUndistortRectifyMap here
     # C'est à vous de jouer!!!
-    # 
-    #
+    mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, newcameramtx, newImageSize, cv2.CV_32FC1)
 
     return mapx, mapy
 
@@ -77,8 +76,7 @@ def rectify(frame, mapx, mapy):
     dst = []
     # 1.1.3.2 - Implement remap here
     # C'est à vous de jouer!!!
-    # 
-    #
+    dst = cv2.remap(frame, mapx, mapy, cv2.INTER_LINEAR)
     return dst
 
 def calibrateStereo(objpoints, imgpointsLeft, imgPointsRight, imgSize):
@@ -95,13 +93,18 @@ def calibrateStereo(objpoints, imgpointsLeft, imgPointsRight, imgSize):
 
     #2.1.1 - Implémenter la fonction calibrateCameraExtended
     # C'est à vous de jouer!!!
-    # 
-    #
+    retLeft, mtxLeft, distLeft, rvecsLeft, tvecsLeft, _, _, pveLeft = cv2.calibrateCameraExtended(
+        objpoints, imgpointsLeft, imgSize, None, None
+    )
+    retRight, mtxRight, distRight, rvecsRight, tvecsRight, _, _, pveRight = cv2.calibrateCameraExtended(
+        objpoints, imgPointsRight, imgSize, None, None
+    )
 
     #2.1.1 - Implémenter la fonction stereoCalibrateExtended
     # C'est à vous de jouer!!!
-    # 
-    #
+    ret, mtxLeft, distLeft, mtxRight, distRight, R, T, E, F, rvecs, tvecs, pve = cv2.stereoCalibrateExtended(
+        objpoints, imgpointsLeft, imgPointsRight, mtxLeft, distLeft, mtxRight, distRight, imgSize, None, None
+    )
     return ret, mtxLeft, distLeft, mtxRight, distRight, R, T, rvecs, tvecs, pve
 
 
@@ -111,13 +114,14 @@ def computeCorrectionMapsStereo(imageSize, mtxLeft, distLeft, mtxRight, distRigh
     h,  w = imageSize[:2]
     # 2.2.1 - Implement stereoRectify here
     # C'est à vous de jouer!!!
-    # 
-    #
+    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
+        mtxLeft, distLeft, mtxRight, distRight, (w, h), R, T, alpha=alpha, newImageSize=newImageSize
+    )
 
     # 2.2.2 - Implement initUndistortRectifyMap here
     # C'est à vous de jouer!!!
-    # 
-    #
+    mapxLeft, mapyLeft = cv2.initUndistortRectifyMap(mtxLeft, distLeft, R1, P1, newImageSize, cv2.CV_32FC1)
+    mapxRight, mapyRight = cv2.initUndistortRectifyMap(mtxRight, distRight, R2, P2, newImageSize, cv2.CV_32FC1)
 
     return mapxLeft, mapyLeft, mapxRight, mapyRight
 
@@ -127,7 +131,7 @@ def visualizeBoards(mtx, rvecs, tvecs, rows, cols, patternSize_mm, cameraWidth =
     
     # Plot settings
     fig = plt.figure(figureName)
-    ax = fig.gca(projection='3d')
+    ax = fig.add_subplot(111, projection='3d')
     ax.set_title(figureName)
     ax.set_xlabel('x')
     ax.set_ylabel('z')

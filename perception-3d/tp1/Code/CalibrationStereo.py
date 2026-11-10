@@ -9,9 +9,11 @@ import glob
 import CalibUtils
 from CalibTools import *
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+
 #Get Left and Right images
-viewsLeft, image_namesLeft = getImages(os.path.join("data\\calibration_nav_3003\\NAV\\Calib", '*_0.png'));
-viewsRight, image_namesRight = getImages(os.path.join("data\\calibration_nav_3003\\NAV\\Calib", '*_1.png'));
+viewsLeft, image_namesLeft = getImages(os.path.join(DATA_DIR, "Calib", '*_0.png'));
+viewsRight, image_namesRight = getImages(os.path.join(DATA_DIR, "Calib", '*_1.png'));
 
 imgCalibLeft = []
 imgPointsLeft = []
@@ -78,8 +80,8 @@ for view in viewsLeft:
     idx = idx+1
 
 #Load test stereo pair
-imgLeft = cv2.imread("data\\calibration_nav_3003\\Test\\left_2.png", cv2.IMREAD_GRAYSCALE)
-imgRight = cv2.imread("data\\calibration_nav_3003\\Test\\right_2.png", cv2.IMREAD_GRAYSCALE)
+imgLeft = cv2.imread(os.path.join(DATA_DIR, "Test", "left_2.png"), cv2.IMREAD_GRAYSCALE)
+imgRight = cv2.imread(os.path.join(DATA_DIR, "Test", "right_2.png"), cv2.IMREAD_GRAYSCALE)
 imgLeft = cv2.resize(imgLeft, (1024,1024))
 imgRight = cv2.resize(imgRight, (1024,1024))
 resultLeft = rectify(imgLeft, mapxLeft, mapyLeft);
