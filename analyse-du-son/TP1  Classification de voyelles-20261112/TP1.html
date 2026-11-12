@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html>
+
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>2A SRI TAP - TP2</title>
+</head>
+
+<body>
+
+<h1 style="text-align: center;">M2 INFO : KINX9AC1 - Analyse du son - TP1<br>
+&nbsp; Classification de voyelles par lois gaussiennes</h1>
+
+
+<h2>Objectifs du TP, savoir :</h2>
+<ul>
+<li>vérifier le type des données à traiter,</li>
+<li>estimer les paramètres de lois gausiennes,</li>
+<li>réaliser une classification par cette approche Bayésienne,</li>
+<li>représenter visuellement les résultats.</li>
+</ul>
+
+
+<h2>Vérification des données</h2>
+<ul>
+<li><b>Récupérer le notebook "notebook_TP1_RAP_NOM_ETUDIANT.ipynb", le renommer avec votre NOM et le compléter !</b></li><br>
+<li>Charger les données d'apprentissage avec le code suivant : <br>
+<span style="font-family: monospace;">
+f = open('APP.pkl', 'rb')<br>
+dicoAPP = pickle.load(f)<br>
+app_aa = dicoAPP["aa"]<br>
+app_ii = dicoAPP["ii"]<br>
+app_uu = dicoAPP["uu"]<br>
+f.close()<br>
+</span>
+Il s'agit de matrices 80x2 résultant d'une ACP sur une paramétrisation cepstrale (cf. cours M1).</li><br>
+
+<li>Afficher sur une seule figure, en utilisant <span style="font-family: monospace;">subplot(nb_lignes, nb_colonnes, numero_trace)</span>, l'histogramme de chacune des classes : aa, uu et ii. <br>
+Que pouvez-vous conclure ?</li>
+</ul>
+
+
+<h2>Utilisation de lois gaussiennes</h2>
+<ul>
+<li><b>APPRENTISSAGE</b> : estimer les paramètres (moyenne et matrice de covariance) de chaque classe.</li><br>
+
+<li><b>RECONNAISSANCE</b> : écrire une fonction <span style="font-family: monospace;">classer </span> qui renvoie la classe obtenue par maximum de vraisemblance sur les lois gaussiennes estimées sur l'observation fournie en entrée :<br>
+<span style="font-family: monospace;">
+def classer(observation, moyenne_aa, covariance_aa, moyenne_uu, covariance_uu, moyenne_ii, covariance_ii):</span><br><br>
+
+Des observations à tester sont présentes dans le fichier Pickle suivant (à charger comme pour les données d'apprentissage) :
+<span style="font-family: monospace; color: rgb(0, 0, 0);">TST.pkl</span><br>
+
+Exemple de résultat : 
+<span style="font-family: monospace;">
+classe = classer(tst_aa[0,:], m_aa, c_aa, m_uu, c_uu, m_ii, c_ii)<br> 
+=&gt; no_classe = 1</span></li>
+</ul>
+
+
+<h2>Représentation des résultats</h2>
+
+<ul>
+<li>Réaliser une fonction qui effectue tous les tests de classification et qui affiche une matrice de confusion et un taux de reconnaissance.<br>
+
+<span style="font-family: monospace; color: rgb(0, 0, 0);">
+matrice_confusion, taux_reco = tout_tester(tst_aa, tst_uu, tst_ii, m_aa, c_aa, m_uu, c_uu, m_ii, c_ii)</span></li><br>
+
+<li>Commenter les résultats obtenus :<span style="font-family: monospace; color: rgb(0, 0, 0);"><br>
+matrice_confusion =<br>
+&nbsp;20&nbsp;&nbsp;0&nbsp;&nbsp;0<br>
+&nbsp;&nbsp;0&nbsp;20&nbsp;&nbsp;0<br>
+&nbsp;&nbsp;0&nbsp;&nbsp;0&nbsp;20<br>
+taux_reco = 1</span></li><br>
+
+<li>Représenter en 2D les nuages de points par des couleurs différentes.</li><br>
+
+<li>Afficher les centroïdes des différentes classes.</li><br>
+
+<li>Réaliser une animation pour l'affichage des points de test (un par un avec des couleurs par exemple...).</li><br>
+
+</ul>
+
+</body>
+</html>
